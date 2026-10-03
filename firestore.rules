@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'shayeis@gmail.com';
+    }
+    function validBoard() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['version', 'name', 'mode', 'previewAnnual', 'countdowns', 'annual', 'revision'])
+        && data.version == 1
+        && data.name is string && data.name.size() <= 40
+        && data.mode in ['days', 'weeks']
+        && data.previewAnnual is bool
+        && data.countdowns is list && data.countdowns.size() <= 3
+        && data.annual is list && data.annual.size() <= 500
+        && data.revision is int;
+    }
+    match /boards/home {
+      allow get: if true;
+      allow create: if isAdmin() && validBoard() && request.resource.data.revision == 1;
+      allow update: if isAdmin() && validBoard()
+        && request.resource.data.revision == resource.data.revision + 1;
+      allow delete, list: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

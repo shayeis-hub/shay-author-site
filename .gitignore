@@ -3,3 +3,5 @@ node_modules
 .vercel
 *.tsbuildinfo
 .DS_Store
+public/dashboard.js
+.env*
