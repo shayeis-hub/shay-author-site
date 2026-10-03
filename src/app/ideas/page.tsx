@@ -1,0 +1,5 @@
+import type {Metadata} from 'next';
+import Link from 'next/link';
+const portrait = {url: '/shay-eisenberg.jpg', width: 1365, height: 2048, alt: 'Shay Eisenberg'};
+export const metadata:Metadata={title:'Ideas',description:'A future home for notes and videos from Shay Eisenberg on habits, stories, and everyday life.',alternates:{canonical:'/ideas'},openGraph:{title:'Ideas | Shay Eisenberg',description:'Notes and videos are on their way.',url:'/ideas',images:[portrait]},twitter:{card:'summary_large_image',title:'Ideas | Shay Eisenberg',description:'Notes and videos are on their way.',images:[portrait.url]}};
+export default function Ideas(){return <main id="main" className="wrap ideas-page"><p className="eyebrow">Ideas / Notes / Videos</p><h1>More to<br/><em>come.</em></h1><div className="ideas-bottom"><p>This space will grow into a home for notes and videos about habits, human behavior, and the stories we tell. For now, the books are a good place to begin.</p><Link className="text-link" href="/books">Explore the books <span aria-hidden="true">↗</span></Link></div></main>}
