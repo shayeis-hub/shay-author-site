@@ -88,14 +88,14 @@ export function setupSlideshow({app,db,isAdmin,toast}){
     else void showNext();
   }
   async function prepareImage(file){
-    if(!TYPES.includes(file.type)||file.size>20*1024*1024)throw Error('יש לבחור JPG, PNG או WebP עד 20MB');
+    if(!TYPES.includes(file.type))throw Error('יש לבחור JPG, PNG או WebP');
     const bitmap=await createImageBitmap(file);
     try{
       const scale=Math.min(1,2560/Math.max(bitmap.width,bitmap.height));
       const canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);
       const context=canvas.getContext('2d');context.fillStyle='white';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(bitmap,0,0,canvas.width,canvas.height);
       const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.88));
-      if(!blob||blob.size>5*1024*1024)throw Error('התמונה גדולה מדי לאחר התאמה למסך');return blob;
+      if(!blob)throw Error('לא ניתן לעבד את התמונה');return blob;
     }finally{bitmap.close();}
   }
   async function addPhotos(photos){
@@ -134,12 +134,12 @@ export function setupSlideshow({app,db,isAdmin,toast}){
         for(const item of page.items){
           if(photos.length>=MAX_PHOTOS)break;
           const metadata=await getMetadata(item);
-          if(TYPES.includes(metadata.contentType)&&metadata.size<=5*1024*1024)photos.push({path:item.fullPath,url:await getDownloadURL(item),title:(metadata.customMetadata?.title||item.name).slice(0,120)});
+          if(TYPES.includes(metadata.contentType))photos.push({path:item.fullPath,url:await getDownloadURL(item),title:(metadata.customMetadata?.title||item.name).slice(0,120)});
         }
         processed+=page.items.length;pageToken=page.nextPageToken;
       }while(pageToken&&photos.length<MAX_PHOTOS&&processed<500);
       busy=false;
-      if(photos.length)await addPhotos(photos);else status('לא נמצאו תמונות בתיקייה dashboard-photos. העלה אליה JPG, PNG או WebP עד 5MB.');
+      if(photos.length)await addPhotos(photos);else status('לא נמצאו תמונות בתיקייה dashboard-photos. העלה אליה JPG, PNG או WebP.');
     }catch{busy=false;status('טעינת התמונות נכשלה. בדוק ש־Storage פעיל ושכללי האחסון פורסמו.');}
     finally{busy=false;updateControls();}
   };

@@ -7,11 +7,9 @@ service firebase.storage {
         && request.auth.token.email == 'shayeis@gmail.com';
     }
     match /dashboard-photos/{path=**} {
-      allow get: if resource.contentType in ['image/jpeg', 'image/png', 'image/webp']
-        && resource.size <= 5 * 1024 * 1024;
+      allow get: if resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
       allow list: if isAdmin();
       allow create, update: if isAdmin()
-        && request.resource.size <= 5 * 1024 * 1024
         && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
       allow delete: if isAdmin();
     }
