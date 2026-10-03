@@ -79,7 +79,15 @@ export function setupSlideshow({app,db,isAdmin,toast}){
       const preload=new Image();preload.src=photo.url;await preload.decode();
       if(thisGeneration!==generation)return;
       const slot=1-activeSlot,img=$(slot?'photo-b':'photo-a'),old=$(activeSlot?'photo-b':'photo-a');
-      img.style.objectFit=state.fit;img.src=photo.url;img.hidden=false;img.classList.add('active');old.classList.remove('active');
+      // Paint the decoded incoming image at zero opacity before starting the fade.
+      img.classList.remove('active');img.style.zIndex='2';old.style.zIndex='1';
+      img.style.objectFit=state.fit;img.src=photo.url;img.hidden=false;
+      await img.decode();
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      if(thisGeneration!==generation)return;
+      img.classList.add('active');
+      // Keep the old image opaque underneath until the incoming image fully covers it.
+      setTimeout(()=>{if(thisGeneration===generation&&currentPath===photo.path)old.classList.remove('active');},2500);
       $('photo-stage').style.setProperty('--slide-background',`url(${JSON.stringify(new URL(photo.url).href)})`);
       $('photo-empty').hidden=true;$('photo-caption').hidden=false;$('photo-caption').textContent=(state.photos.findIndex(p=>p.path===photo.path)+1)+' / '+state.photos.length;
       activeSlot=slot;currentPath=photo.path;
