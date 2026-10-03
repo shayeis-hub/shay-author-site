@@ -51,7 +51,16 @@ function weeksText(days){const w=Math.floor(days/7),d=days%7;const a=w===1?'שב
 function renderClock(){const now=new Date();$('clock').textContent=new Intl.DateTimeFormat('he-IL',{timeZone:ZONE,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now);$('date').textContent=new Intl.DateTimeFormat('he-IL',{weekday:'long',day:'numeric',month:'long',timeZone:ZONE}).format(now);$('hebrew').textContent=hebrewText(now);$('last-update').textContent=$('clock').textContent;const key=civil(now);if(key!==lastDay){lastDay=key;renderContent();}}
 let lastDay='';
 
-function renderCountdowns(){let out=state.countdowns.map((e,i)=>{const n=daysBetween(civil(),e.date);let value=n===0?'<strong style="font-size:36px">היום!</strong>':n<0?'<span class="unit">האירוע הסתיים</span>':state.mode==='weeks'?`<strong style="font-size:28px;letter-spacing:0;direction:rtl">${weeksText(n)}</strong>`:`<strong>${n}</strong><span class="unit">ימים</span><span class="secondary">${weeksText(n)}</span>`;return `<article class="countdown ${i===0?'featured':''}"><div class="event-type">${n>=0?'סופרים לקראת':'נשאר בזיכרון'}</div><h3>${escapeHTML(e.title)}</h3><time datetime="${e.date}">${fmtDate(e.date)}</time><div class="remaining">${value}</div></article>`;}).join('');for(let i=state.countdowns.length;i<3;i++)out+='<button class="countdown add-card" data-action="new-count"><span class="plus" aria-hidden="true">＋</span><span>משהו לחכות לו</span></button>';$('countdowns').innerHTML=out;}
+function weeksMarkup(days){const w=Math.floor(days/7),d=days%7;const parts=[];if(w)parts.push(w===1?'שבוע':w===2?'שבועיים':`<bdi>${w}</bdi> שבועות`);if(d)parts.push(d===1?'יום':d===2?'יומיים':`<bdi>${d}</bdi> ימים`);return parts.join(' ו־');}
+function renderCountdowns(){
+ let out=state.countdowns.map((e,i)=>{
+  const n=daysBetween(civil(),e.date);
+  const value=n===0?'<strong class="due-today">היום!</strong>':n<0?'<span class="unit">האירוע הסתיים</span>':state.mode==='weeks'?`<strong class="weeks-primary" dir="rtl">${weeksMarkup(n)}</strong>`:`<div class="days-primary" dir="rtl"><strong><bdi>${n}</bdi></strong><span class="unit">ימים</span></div><div class="secondary" dir="rtl">${weeksMarkup(n)}</div>`;
+  return `<article class="countdown ${i===0?'featured':''}"><div class="countdown-details"><h3>${escapeHTML(e.title)}</h3><time datetime="${e.date}">${fmtDate(e.date)}</time></div><div class="remaining">${value}</div></article>`;
+ }).join('');
+ for(let i=state.countdowns.length;i<3;i++)out+='<button class="countdown add-card" data-action="new-count"><span class="plus" aria-hidden="true">＋</span><span>משהו לחכות לו</span></button>';
+ $('countdowns').innerHTML=out;
+}
 function leap(year){return (7*year+1)%19<7;}
 function targetMonths(e,year){if(!e.month.startsWith('אדר'))return [e.month];if(!leap(year))return ['אדר'];if(e.month==='אדר א׳'||e.month==='אדר ב׳')return [e.month];return e.adar==='both'?['אדר א׳','אדר ב׳']:[e.adar==='first'?'אדר א׳':'אדר ב׳'];}
 function annualMatches(e,date){const h=hebrew(date);if(e.year!==null&&h.year<e.year)return false;const months=targetMonths(e,h.year);if(months.includes(h.month)&&e.day===h.day)return true;if(e.day!==30)return false;const prev=hebrew(new Date(date.getTime()-86400000)),next=hebrew(new Date(date.getTime()+86400000));if(e.missing==='previous')return h.day===29&&months.includes(h.month)&&next.month!==h.month;return h.day===1&&prev.day===29&&targetMonths(e,prev.year).includes(prev.month);}
@@ -73,8 +82,19 @@ function monthlyEvents(annual,today=new Date(stamp(civil()))){
  }
  return events;
 }
+let familyPage=0;
 function renderFamily(){
- const events=monthlyEvents(state.annual);
+ let events=monthlyEvents(state.annual);
+ if(new URLSearchParams(location.search).get('tv')==='1'&&window.innerWidth>760){
+  const today=events.filter(x=>x.offset===0),upcoming=events.filter(x=>x.offset>0);
+  const slots=Math.max(1,Math.floor(($('family').clientHeight||220)/88));
+  if(today.length<slots){
+   const remaining=slots-today.length,pages=Math.max(1,Math.ceil(upcoming.length/remaining));
+   familyPage%=pages;events=[...today,...upcoming.slice(familyPage*remaining,(familyPage+1)*remaining)];
+  }else{
+   const pages=Math.max(1,Math.ceil(events.length/slots));familyPage%=pages;events=events.slice(familyPage*slots,(familyPage+1)*slots);
+  }
+ }
  if(!events.length){$('family').innerHTML='<div class="empty"><p>אין אירועים נוספים החודש</p></div>';return;}
  $('family').innerHTML=events.map(({e,offset,date})=>{
   const years=e.year!==null?hebrew(date).year-e.year:null;
@@ -97,7 +117,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
 $('save-settings').onclick=async()=>{const next=structuredClone(state);next.mode=$('display-mode').value;if(await save(next))toast('ההגדרות נשמרו');};
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();else toast('באייפד אפשר להוסיף את הדף למסך הבית מתוך תפריט השיתוף.');}catch(e){toast('הדפדפן אינו מאפשר מסך מלא.');}};
 $('export').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='dashboard-backup-'+civil()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};$('import').onclick=()=>$('import-file').click();$('import-file').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>1000000)throw Error('קובץ הגיבוי גדול מדי.');const next=validateData(JSON.parse(await file.text()));if(confirm('להחליף את כל נתוני הלוח בנתונים מהגיבוי?')&&await save(next))toast('הגיבוי נטען בהצלחה');}catch(error){toast('הייבוא נכשל: '+error.message);}finally{e.target.value='';}};
-if(location.pathname.endsWith('/admin')&&!location.hash)location.hash='#/admin';window.addEventListener('hashchange',route);document.addEventListener('visibilitychange',()=>{if(!document.hidden)renderClock();});render();route();setInterval(renderClock,1000);if(loadError)toast(loadError);
+if(location.pathname.endsWith('/admin')&&!location.hash)location.hash='#/admin';window.addEventListener('hashchange',route);document.addEventListener('visibilitychange',()=>{if(!document.hidden)renderClock();});render();route();if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>renderFamily()).observe($('family'));setInterval(renderClock,1000);setInterval(()=>{if(document.body.classList.contains('tv-mode')&&!document.hidden){familyPage++;renderFamily();}},15000);window.addEventListener('resize',()=>{familyPage=0;renderFamily();});if(loadError)toast(loadError);
 
 const authMessages={
  'auth/unauthorized-domain':'יש לאשר את shayeisenberg.com בדומיינים המורשים ב־Firebase.',
