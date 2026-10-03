@@ -20,12 +20,16 @@ export function setupSlideshow({app,db,isAdmin,toast}){
   const $=id=>document.getElementById(id);
   const storage=getStorage(app),slidesRef=doc(db,'slides','home');
   let state=defaults(),ready=false,busy=false,timer=null,activeSlot=0,currentPath='',generation=0;
-  let order=[],cursor=0,paused=document.hidden,failed=new Set();
+  let order=[],cursor=0,paused=document.hidden,failed=new Set(),settingsDirty=false;
+  const settingIds=['photo-interval','photo-fit','photo-shuffle'];
+  const readSettings=()=>({interval:Number($('photo-interval').value),fit:$('photo-fit').value,shuffle:$('photo-shuffle').checked});
+  for(const id of settingIds)$(id).addEventListener('change',()=>{settingsDirty=true;});
   const status=message=>{$('photo-operation').textContent=message;};
   function updateControls(){
     for(const id of ['upload-photos','scan-photos','save-photos'])$(id).disabled=!isAdmin()||!ready||busy;
     $('photo-count').textContent=state.photos.length+' תמונות';
-    $('photo-interval').value=String(state.interval);$('photo-fit').value=state.fit;$('photo-shuffle').checked=state.shuffle;
+    if(!settingsDirty){$('photo-interval').value=String(state.interval);$('photo-fit').value=state.fit;$('photo-shuffle').checked=state.shuffle;}
+    for(const id of settingIds)$(id).disabled=!isAdmin()||!ready||busy;
     const container=$('photo-admin');container.replaceChildren();
     state.photos.forEach((photo,index)=>{
       const item=document.createElement('div');item.className='photo-admin-item';
@@ -43,7 +47,7 @@ export function setupSlideshow({app,db,isAdmin,toast}){
   }
   async function save(next){
     if(!isAdmin()||!ready||busy)return false;
-    const expected=state.revision;busy=true;updateControls();
+    const expected=state.revision;next={...next,...readSettings()};busy=true;updateControls();
     try{
       validateSlides(next);
       await runTransaction(db,async tx=>{
@@ -51,7 +55,7 @@ export function setupSlideshow({app,db,isAdmin,toast}){
         if(revision!==expected)throw Error('conflict');
         tx.set(slidesRef,{...next,revision:revision+1});
       });
-      status('התמונות וההגדרות נשמרו');return true;
+      state={...next,revision:expected+1};settingsDirty=false;status('התמונות וההגדרות נשמרו');return true;
     }catch(error){status(error.message==='conflict'?'המצגת עודכנה במכשיר אחר. נסה שוב.':'שמירת התמונות נכשלה. בדוק את כללי Firestore והחיבור.');return false;}
     finally{busy=false;updateControls();}
   }
@@ -143,7 +147,7 @@ export function setupSlideshow({app,db,isAdmin,toast}){
     }catch{busy=false;status('טעינת התמונות נכשלה. בדוק ש־Storage פעיל ושכללי האחסון פורסמו.');}
     finally{busy=false;updateControls();}
   };
-  $('save-photos').onclick=()=>{const next=structuredClone(state);next.interval=Number($('photo-interval').value);next.fit=$('photo-fit').value;next.shuffle=$('photo-shuffle').checked;void save(next);};
+  $('save-photos').onclick=()=>void save(structuredClone(state));
   document.addEventListener('visibilitychange',()=>{paused=document.hidden;if(paused)clearTimeout(timer);else{failed.clear();schedule();}});
   onSnapshot(slidesRef,{includeMetadataChanges:true},snapshot=>{
     try{state=snapshot.exists()?validateSlides(snapshot.data()):defaults();ready=!snapshot.metadata.fromCache;render();}
