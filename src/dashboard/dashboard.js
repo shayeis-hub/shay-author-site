@@ -1,3 +1,4 @@
+import {setupSlideshow} from './slideshow.js';
 import {initializeApp} from 'firebase/app';
 import {getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut} from 'firebase/auth';
 import {getFirestore, doc, onSnapshot, runTransaction} from 'firebase/firestore';
@@ -49,13 +50,13 @@ function fmtDate(s){return new Intl.DateTimeFormat('he-IL',{day:'numeric',month:
 function weeksText(days){const w=Math.floor(days/7),d=days%7;const a=w===1?'שבוע':w===2?'שבועיים':w?`${w} שבועות`:'';const b=d===1?'יום':d===2?'יומיים':d?`${d} ימים`:'';return [a,b].filter(Boolean).join(' ו־');}
 function renderClock(){const now=new Date();$('clock').textContent=new Intl.DateTimeFormat('he-IL',{timeZone:ZONE,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now);$('date').textContent=new Intl.DateTimeFormat('he-IL',{weekday:'long',day:'numeric',month:'long',timeZone:ZONE}).format(now);$('hebrew').textContent=hebrewText(now);$('last-update').textContent=$('clock').textContent;const key=civil(now);if(key!==lastDay){lastDay=key;renderContent();}}
 let lastDay='';
-function renderMonth(){const today=civil(),d=new Date(stamp(today)),year=d.getUTCFullYear(),month=d.getUTCMonth(),day=d.getUTCDate(),start=new Date(Date.UTC(year,month,1)).getUTCDay(),total=new Date(Date.UTC(year,month+1,0)).getUTCDate();let out=`<div class="month-title"><span>${new Intl.DateTimeFormat('he-IL',{month:'long',year:'numeric',timeZone:ZONE}).format(d)}</span><span class="label">החודש</span></div>`;out+=['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'].map(x=>`<span class="weekday">${x}</span>`).join('');out+='<span aria-hidden="true"></span>'.repeat(start);for(let i=1;i<=total;i++)out+=`<span class="${i===day?'today':i<day?'past':''}" ${i===day?'aria-current="date"':''}>${i}</span>`;$('month').innerHTML=out;}
+
 function renderCountdowns(){let out=state.countdowns.map((e,i)=>{const n=daysBetween(civil(),e.date);let value=n===0?'<strong style="font-size:36px">היום!</strong>':n<0?'<span class="unit">האירוע הסתיים</span>':state.mode==='weeks'?`<strong style="font-size:28px;letter-spacing:0;direction:rtl">${weeksText(n)}</strong>`:`<strong>${n}</strong><span class="unit">ימים</span><span class="secondary">${weeksText(n)}</span>`;return `<article class="countdown ${i===0?'featured':''}"><div class="event-type">${n>=0?'סופרים לקראת':'נשאר בזיכרון'}</div><h3>${escapeHTML(e.title)}</h3><time datetime="${e.date}">${fmtDate(e.date)}</time><div class="remaining">${value}</div></article>`;}).join('');for(let i=state.countdowns.length;i<3;i++)out+='<button class="countdown add-card" data-action="new-count"><span class="plus" aria-hidden="true">＋</span><span>משהו לחכות לו</span></button>';$('countdowns').innerHTML=out;}
 function leap(year){return (7*year+1)%19<7;}
 function targetMonths(e,year){if(!e.month.startsWith('אדר'))return [e.month];if(!leap(year))return ['אדר'];if(e.month==='אדר א׳'||e.month==='אדר ב׳')return [e.month];return e.adar==='both'?['אדר א׳','אדר ב׳']:[e.adar==='first'?'אדר א׳':'אדר ב׳'];}
 function annualMatches(e,date){const h=hebrew(date);if(e.year!==null&&h.year<e.year)return false;const months=targetMonths(e,h.year);if(months.includes(h.month)&&e.day===h.day)return true;if(e.day!==30)return false;const prev=hebrew(new Date(date.getTime()-86400000)),next=hebrew(new Date(date.getTime()+86400000));if(e.missing==='previous')return h.day===29&&months.includes(h.month)&&next.month!==h.month;return h.day===1&&prev.day===29&&targetMonths(e,prev.year).includes(prev.month);}
 function renderFamily(){const max=state.previewAnnual?7:0;const events=[];for(let offset=0;offset<=max;offset++){const date=new Date(stamp(civil())+offset*86400000);for(const e of state.annual)if(annualMatches(e,date))events.push({e,offset,date});}$('family-label').textContent=state.previewAnnual?'היום ובשבוע הקרוב':'לפי התאריך העברי';if(!events.length){$('family').innerHTML=`<div class="empty"><p>${state.annual.length?'אין אירועים משפחתיים '+(max?'בשבוע הקרוב':'היום'):'התאריכים החשובים מתחילים כאן'}</p><small>${state.annual.length?'ימי ההולדת, ימי הנישואין וימי הזיכרון יופיעו בתאריך שהוגדר.':'הוספת ימי הולדת, ימי נישואין וימי זיכרון דרך ניהול הלוח.'}</small></div>`;return;}$('family').innerHTML=events.map(({e,offset,date})=>{const years=e.year!==null?hebrew(date).year-e.year:null;const suffix=years!==null&&years>0?` · ${e.kind==='birthday'?'גיל '+years:e.kind==='anniversary'?years+' שנות נישואין':years+' שנים לזכרו/ה'}`:'';return `<div class="event-row"><div class="event-mark ${e.kind==='memorial'?'memorial':''}" aria-hidden="true">${e.kind==='birthday'?'✧':e.kind==='anniversary'?'♡':'🕯'}</div><div><div class="event-name">${escapeHTML(e.title)}</div><div class="event-meta">${eventKindLabel(e.kind)} · ${numeral(e.day)} ב${escapeHTML(e.month)}${suffix}</div></div><span class="today-tag">${offset===0?'היום':offset===1?'מחר':'בעוד '+offset+' ימים'}</span></div>`;}).join('');}
-function renderContent(){renderMonth();renderCountdowns();renderFamily();}
+function renderContent(){renderCountdowns();renderFamily();}
 function renderAdmin(){const rows=(array,type)=>array.map(e=>`<div class="admin-row"><div class="details"><div class="event-name">${escapeHTML(e.title)}</div><div class="event-meta">${type==='count'?fmtDate(e.date):(eventKindLabel(e.kind))+' · '+numeral(e.day)+' ב'+escapeHTML(e.month)+(e.year?' · '+numeral(e.year%1000):'')}</div></div><div class="actions"><button data-action="edit-${type}" data-id="${escapeHTML(e.id)}">עריכה</button><button class="danger" data-action="delete-${type}" data-id="${escapeHTML(e.id)}" aria-label="מחיקת ${escapeHTML(e.title)}">מחיקה</button></div></div>`).join('');$('count-admin').innerHTML=rows(state.countdowns,'count');$('annual-admin').innerHTML=rows(state.annual,'annual')||'<div class="empty"><p>עדיין לא נוספו תאריכים.</p></div>';$('count-limit').textContent=state.countdowns.length+' מתוך 3';$('add-count').disabled=state.countdowns.length>=3;$('display-mode').value=state.mode;$('preview-annual').checked=state.previewAnnual;}
 function render(){renderContent();renderAdmin();renderClock();}
 function route(){const admin=location.hash==='#/admin';$('admin-content').hidden=!canEdit;$('admin').hidden=!admin;$('board').hidden=admin;$('nav-link').href=admin?'#/':'#/admin';$('nav-link').textContent=admin?'חזרה ללוח':'ניהול הלוח ⚙';$('fullscreen').hidden=admin;document.title=admin?'ניהול הלוח | היום שלנו':'היום שלנו | לוח אישי';if(admin)renderAdmin();window.scrollTo(0,0);}
@@ -85,12 +86,13 @@ $('sign-in').onclick=async()=>{
  finally{$('sign-in').disabled=false;}
 };
 $('sign-out').onclick=()=>signOut(auth);
+const slides=setupSlideshow({app,db,isAdmin:()=>canEdit,toast});
 onAuthStateChanged(auth,user=>{
  canEdit=!!user&&user.emailVerified&&user.email?.toLowerCase()===ADMIN_EMAIL;
  $('sign-in').hidden=canEdit;$('sign-out').hidden=!user;
  $('auth-status').textContent=canEdit?'מחובר כמנהל הלוח':user?'לחשבון הזה אין הרשאת ניהול. יש להיכנס עם חשבון המנהל.':'כדי לערוך את הלוח יש להיכנס עם חשבון המנהל.';
  if(!canEdit&&!$('modal').hidden)closeEditor();
- route();
+ route();slides.updateControls();
 });
 onSnapshot(boardRef,{includeMetadataChanges:true},snapshot=>{
  try{

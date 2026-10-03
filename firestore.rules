@@ -24,6 +24,21 @@ service cloud.firestore {
         && request.resource.data.revision == resource.data.revision + 1;
       allow delete, list: if false;
     }
+    function validSlides() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['version', 'revision', 'interval', 'fit', 'shuffle', 'photos'])
+        && data.version == 1 && data.revision is int
+        && data.interval in [15, 30, 60, 120]
+        && data.fit in ['contain', 'cover'] && data.shuffle is bool
+        && data.photos is list && data.photos.size() <= 60;
+    }
+    match /slides/home {
+      allow get: if true;
+      allow create: if isAdmin() && validSlides() && request.resource.data.revision == 1;
+      allow update: if isAdmin() && validSlides()
+        && request.resource.data.revision == resource.data.revision + 1;
+      allow list, delete: if false;
+    }
     match /{document=**} {
       allow read, write: if false;
     }
